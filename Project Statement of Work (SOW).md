@@ -35,6 +35,9 @@ We will be implementing an online Trivia game to be played by multiple users.
 ### Technical Requirements:
 - **Hardware:**
 - **Software:**
+   - Git
+   - Python
+   - IDE (VS Code)
 </br>
 
 ### Assumptions:
