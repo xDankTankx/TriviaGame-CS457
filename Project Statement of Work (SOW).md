@@ -12,7 +12,8 @@ Online Multiplayer Trivia Game
 ### Project Objective:
 We will be implementing an online Trivia game to be played by multiple users.
 - **Problems:**
-- **Functionality:** Allow up to 4 players compete against each other in an online trivia game.
+- **Functionality:**
+   - Allow up to 4 players to compete against each other in an online trivia game.
 </br>
 
 ### Scope:
@@ -21,6 +22,9 @@ We will be implementing an online Trivia game to be played by multiple users.
 </br>
 
 ### Deliverables:
+- Players will be given a question during each round along with a selection of possible answers.
+- Players will be notified once a winner has been chosen.
+- Answers will be determined by a auto checker to evaluate correctness of each user's response.
 </br>
 
 ### Timeline
@@ -46,6 +50,8 @@ We will be implementing an online Trivia game to be played by multiple users.
 </br>
 
 ### Communication Plan:
+- Primary communication will be held over Teams and Discord.
+- Regular meetings will be scheduled weekly with frequent updates in between.
 </br>
 
 ### Additional Notes:
