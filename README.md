@@ -6,7 +6,7 @@ This is a simple yet enjoyable trivia game you may play by yourself or with up t
 1. **Start the server:** Run the `TCP_server.py` script. This script will ask how many players will be playing (answer 1-4) (This will be implemented by Sprint 2), before initializing and waiting to connect to the amount of players specified on start-up. Once the players are connected the server will wait 5 seconds before sending the first trivia question to all connected clients.
 </br>
 
-2. **Connect clients:** Run the `TCP_client.py` script on up to four different machines or terminals (Note that this software can accept more clients as of now, but we plan to limit it to four connections ((10/06/2024))). Please wait 5 seconds after all specified players/clients have connected to the server before typing or entering anything to allow the server to accurately send out the first question.
+2. **Connect clients:** Run the `TCP_client.py` script on up to four different machines or terminals (Note that this software can accept more clients as of now, but we plan to limit it to four connections ((10/06/2024))). Please wait 5 seconds after all specified players/clients have connected to the server before typing or entering anything to allow the server to accurately send out the first question. Now players have to enter a username for their session to begin which they can then message other clients, move their position in queue and quit. (10/20/2024)
 </br>
 
 3. **Play the game:** Players answer the question posed by the server as quickly and as accurately as they can. Whichever player's answer is received first will be checked first by the server to see whether it is correct or not. Whichever player's answer is correct will recieve 1 point! This game loop will last for 10 rounds (as of now: 9/22/24) and at the end of the final 10th round, the server will automatically check each player's points to determine a winner. Then will output each player's place in ranking to all clients. The first place winner will recieve a congratulatory message (the others will receive a message as well but 2nd, 3rd, and 4th place messages will be determined at a later date). Have fun and enjoy!
@@ -17,6 +17,8 @@ This is a simple yet enjoyable trivia game you may play by yourself or with up t
 * Sockets
 * Logging
 * Threading
+* JSON
+* sys
 </br>
 
 **Additional resources:**
