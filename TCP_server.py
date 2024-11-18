@@ -2,12 +2,77 @@ import socket
 import threading
 import json
 import logging
+import random
 
 logging.basicConfig(level=logging.INFO)
+
 clients = {}  # Dictionary to store clients and their usernames
 game_state = {}  # Game state to track players' positions, scores, and turns
 current_turn = None  # Track whose turn it is
 next_position = 1  # Track the next position number to assign
+questions = []  # Array to store trivia questions
+current_question = None  # Store the current trivia question
+correct_player = None  # Track who answered correctly
+total_players = None  # Total number of players expected
+
+# Initialize trivia question bank
+def initialize_questions():
+    global questions
+    questions = [
+        {"question": "What is the capital of France?", "options": ["Paris", "London", "Berlin", "Rome"], "answer": "Paris"},
+        {"question": "Which planet is known as the Red Planet?", "options": ["Earth", "Mars", "Jupiter", "Saturn"], "answer": "Mars"},
+        {"question": "Who wrote 'To Kill a Mockingbird'?", "options": ["Harper Lee", "Mark Twain", "J.K. Rowling", "Ernest Hemingway"], "answer": "Harper Lee"},
+        {"question": "What is the smallest prime number?", "options": ["1", "2", "3", "5"], "answer": "2"},
+        {"question": "What is the boiling point of water in Celsius?", "options": ["90", "95", "100", "110"], "answer": "100"},
+        {"question": "Which element has the chemical symbol 'O'?", "options": ["Oxygen", "Osmium", "Gold", "Silver"], "answer": "Oxygen"},
+        {"question": "Who painted the Mona Lisa?", "options": ["Leonardo da Vinci", "Pablo Picasso", "Vincent van Gogh", "Claude Monet"], "answer": "Leonardo da Vinci"},
+        {"question": "What is the largest ocean on Earth?", "options": ["Atlantic", "Pacific", "Indian", "Arctic"], "answer": "Pacific"},
+        {"question": "In which year did World War II end?", "options": ["1942", "1945", "1948", "1950"], "answer": "1945"},
+        {"question": "What is the chemical formula for water?", "options": ["H2O", "CO2", "NaCl", "O2"], "answer": "H2O"},
+    ]
+
+# Function to pick and remove a random question
+def get_random_question():
+    global questions
+    if len(questions) == 0:
+        return None  # No more questions available
+    question = random.choice(questions)
+    questions.remove(question)  # Remove the used question from the array
+    return question
+
+# Function to handle trivia questions
+def send_question():
+    global current_question
+    current_question = get_random_question()
+    if current_question:
+        broadcast(json.dumps({
+            "type": "question",
+            "data": {
+                "question": current_question["question"],
+                "options": current_question["options"]
+            }
+        }))
+        return current_question
+    else:
+        logging.info("No more questions available.")
+        broadcast(json.dumps({
+            "type": "system",
+            "data": {
+                "message": "No more questions available. The game has ended!"
+            }
+        }))
+        return None
+
+def send_current_question(client_socket):
+    """Send the current question to a specific client if one is active."""
+    if current_question:
+        client_socket.send(json.dumps({
+            "type": "question",
+            "data": {
+                "question": current_question["question"],
+                "options": current_question["options"]
+            }
+        }).encode('utf-8'))
 
 def broadcast(message, sender_socket=None):
     """Send the message to all connected clients except the sender."""
@@ -27,7 +92,7 @@ def broadcast_game_state():
 
 def handle_turn_progression():
     """Advance the turn to the next player and notify all clients."""
-    global current_turn
+    global current_turn, correct_player
     client_list = list(clients.keys())
     if client_list:
         # Rotate to the next client in the list
@@ -35,17 +100,63 @@ def handle_turn_progression():
         next_index = (current_index + 1) % len(client_list)
         current_turn = client_list[next_index]
         
+        # If it's the first player's turn again, broadcast the result of the last question
+        if current_turn == client_list[0]:
+            if correct_player:
+                broadcast(json.dumps({"type": "system", "data": {"message": f"{correct_player} answered the question correctly!"}}))
+            else:
+                broadcast(json.dumps({"type": "system", "data": {"message": "No one answered the question correctly!"}}))
+            correct_player = None  # Reset for the next question
+            send_question()  # Send a new question
+
         # Broadcast the current turn to all clients
         broadcast(json.dumps({"type": "turn_update", "data": {"current_turn": clients[current_turn]}}))
 
+def handle_answer(data, client_socket):
+    """Handle a player's answer and check correctness."""
+    global current_question, correct_player
+    username = clients[client_socket]
+    answer = data.get('answer')
+
+    if current_question and answer:
+        # Convert numeric input to option text if necessary
+        if answer.isdigit():
+            option_index = int(answer) - 1  # Convert to 0-based index
+            if 0 <= option_index < len(current_question["options"]):
+                answer = current_question["options"][option_index]
+
+        if answer == current_question["answer"]:
+            if correct_player is None:  # Only the first correct answer counts
+                correct_player = username
+            game_state[username]["score"] += 1  # Increment score for correct answer
+            logging.info(f"{username} answered correctly!")
+            broadcast(json.dumps({"type": "system", "data": {"message": f"{username} answered correctly!"}}))
+        else:
+            logging.info(f"{username} answered incorrectly.")
+            broadcast(json.dumps({"type": "system", "data": {"message": f"{username} answered incorrectly."}}))
+    else:
+        logging.info(f"No active question or invalid answer from {username}.")
+
+    # Progress the turn to the next player
+    handle_turn_progression()
+
 def handle_message(message, client_socket):
     """Process incoming JSON messages based on their type."""
-    global current_turn, next_position
+    global current_turn, next_position, total_players
     try:
         data = json.loads(message)
-        message_type = data.get('type')
+        message_type = data['type']
 
-        if message_type == 'join':
+        if message_type == 'total_players' and total_players is None:
+            # Set the total number of players
+            total_players = int(data['data']['count'])
+            logging.info(f"Total players set to {total_players}. Waiting for players to join.")
+            broadcast(json.dumps({
+                "type": "system",
+                "data": {"message": f"Waiting for {total_players} players to join."}
+            }))
+
+        elif message_type == 'join':
             username = data['data']['username']
             if client_socket not in clients:
                 clients[client_socket] = username
@@ -59,33 +170,24 @@ def handle_message(message, client_socket):
                 # Broadcast the updated game state to all clients
                 broadcast_game_state()
 
-                # Set the first client as the current turn if current_turn is None
-                if current_turn is None:
-                    current_turn = client_socket
-                
-                # Broadcast the current turn to all clients
-                broadcast(json.dumps({"type": "turn_update", "data": {"current_turn": clients[current_turn]}}))
+                # Start the game when all players join
+                if total_players and len(clients) == total_players:
+                    logging.info(f"All {total_players} players have joined. Starting the game.")
+                    current_turn = list(clients.keys())[0]  # Set the first turn
+                    send_question()  # Start trivia
+                    broadcast(json.dumps({"type": "turn_update", "data": {"current_turn": clients[current_turn]}}))
 
-        elif client_socket in clients:  # Ensure client has joined before proceeding
+        elif client_socket in clients:  # Handle game actions
             username = clients[client_socket]
-
-            if message_type == 'move' and client_socket == current_turn:
-                position = data['data']['position']
-                game_state[username]["position"] = position
-                game_state[username]["score"] += 1  # Example score increment for a move
-                logging.info(f"{username} moved to position {position}")
-
-                # Broadcast the updated game state to all clients
-                broadcast_game_state()
-
-                # Progress the turn after a valid move
-                handle_turn_progression()
-
+            
+            if message_type == 'answer' and client_socket == current_turn:
+                handle_answer(data, client_socket)
+            
             elif message_type == 'chat':
                 chat_message = data['data']['message']
                 logging.info(f"{username} says: {chat_message}")
                 broadcast(json.dumps({"type": "chat", "data": {"username": username, "message": chat_message}}))
-
+            
             elif message_type == 'quit':
                 logging.info(f"{username} has quit the game.")
                 broadcast(json.dumps({"type": "system", "data": {"message": f"{username} has left the game!"}}))
@@ -93,17 +195,14 @@ def handle_message(message, client_socket):
                     del clients[client_socket]
                 if username in game_state:
                     del game_state[username]
-                
-                # Broadcast updated game state after player quits
                 broadcast_game_state()
-
-                # If the quitting player was the current turn, progress the turn
                 if client_socket == current_turn:
                     handle_turn_progression()
 
     except json.JSONDecodeError as e:
         logging.error(f"Failed to decode message: {e}")
-
+        
+        # Function to handle a single client
 def handle_client(client_socket, address):
     """Handle communication with a connected client."""
     logging.info(f"Connection from {address}")
@@ -129,8 +228,9 @@ def handle_client(client_socket, address):
                 handle_turn_progression()
         client_socket.close()
 
-def start_server(host='127.0.0.1', port=65432):
+def start_server(host='127.0.0.1', port=65433):
     """Start the server and listen for incoming connections."""
+    initialize_questions()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((host, port))
     server.listen(5)
@@ -138,7 +238,6 @@ def start_server(host='127.0.0.1', port=65432):
     
     while True:
         client_socket, addr = server.accept()
-        client_handler = threading.Thread(target=handle_client, args=(client_socket, addr))
-        client_handler.start()
+        threading.Thread(target=handle_client, args=(client_socket, addr)).start()
 
 start_server()
