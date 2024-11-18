@@ -1,5 +1,5 @@
 # TriviaGame-CS457
-This is a simple yet enjoyable trivia game you may play by yourself or with up to four additional friends who must be on different computers. This game was created by using Python sockets to seamlessly connect you and your friends so that you all may play a trivia game together! This game proposes a question from the server and waits to listen for responses. Once a response from a client is received, the server will assign it a position in queue starting at one up to the number of players. The server then checks whether the answer from whoever answered first was correct or not, and if it wasn't, it checks the next answer in the order received. This allows for seamless connectivity as well as ensuring the players who answered the quickest with the correct answer can win! Points will be assigned to those who answered correctly first, and the winner is tallied up at the end of the last question. This is a product made for educational purposes by Nicholas Chaffee and Chasen Villiers. This was made as an assignment for CS457. 
+This is a simple yet enjoyable trivia game you may play by yourself or with up to four additional friends who must be on different computers. This game was created by using Python sockets to seamlessly connect you and your friends so that you all may play a trivia game together! This game proposes a question from the server and waits to listen for responses. Once a response from a client is received, the server will assign it a position in queue starting at one up to the number of players. The server then checks whether the answer from whoever answered first was correct or not, and if it wasn't, it checks the next answer in the order received. This allows for seamless connectivity as well as ensuring the players who answered the quickest with the correct answer can win! Points will be assigned to those who answered correctly first, and the winner is tallied up at the end of the last question. This is a product made for educational purposes by Nicholas Chaffee and Chasen Villiers. This was made as an assignment for CS457.  
 </br> </br>
 
 ### New Features and Updates
@@ -14,24 +14,58 @@ This is a simple yet enjoyable trivia game you may play by yourself or with up t
 5. **Improved Client Interface for Turn Waiting**: Players waiting for their turn no longer receive continuous "Waiting for turn" messages. Instead, they receive a single notification about waiting for the current player’s turn, and the display updates when the turn changes.
 
 ### How to play:
-1. **Start the server:** Run the `TCP_server.py` script. This script will ask how many players will be playing (answer 1-4) (This will be implemented by Sprint 2), before initializing and waiting to connect to the number of players specified on start-up. Once the players are connected, the server will wait 5 seconds before sending the first trivia question to all connected clients.
+1. **Start the server:**  
+   Run the `server.py` script:
+   ```bash
+   python server.py -p <PORT>
+
+### Game Instructions
+
+1. **Start the Server:**
+   - Replace `<PORT>` with the desired port number (e.g., `65433`).
+   - The server will bind to `0.0.0.0`, making it accessible across the local network.
+   - The first client to connect will set the total number of players.
+   - The server waits for all players to join before starting the game.
+   </br>
+
+2. **Connect Clients:**
+   - Run the `client.py` script for each player:
+     ```bash
+     python client.py -i <SERVER_IP> -p <PORT>
+     ```
+   - Replace `<SERVER_IP>` with the server's IP address (e.g., `127.0.0.1` for localhost).
+   - Replace `<PORT>` with the same port used to start the server.
+   - Each client must connect using a unique device or terminal.
+   </br>
+
+3. **Play the Game:**
+   - The first client will be prompted to set the total number of players.
+   - Each client enters their username upon connecting and sees the updated game state.
+   - During their turn, players answer questions by entering the option number corresponding to their chosen answer.
+   - Points are awarded for correct answers, and scores are updated in real time.
+   - The game continues until all questions are answered, and the winner is determined based on the final scores.
+   </br>
+
+### Game Flow:
+
+- **Joining:** Players join in the order they connect. The first player sets the total number of participants.
+- **Question Display:** The server broadcasts a trivia question to all clients.
+- **Turn-Based Answering:** Only the active player can respond during their turn. If the answer is incorrect, the next player gets their turn.
+- **Score Updates:** After all players have answered, the game state is updated and displayed to all clients.
+- **Winning:** The game ends after a set number of rounds (default: 10). The player with the highest score wins, with results broadcasted to all clients.
 </br>
 
-2. **Connect clients:** Run the `TCP_client.py` script on up to four different machines or terminals. (Note that this software can accept more clients as of now, but we plan to limit it to four connections ((10/06/2024))). Players now enter a username upon connecting, which assigns them a unique position in the game. Once the username is entered, the client is able to see the current game state, including other players' positions and scores. The client interface has been improved to display a single message about waiting for the turn when necessary.
+### Technologies Used:
+
+- **Python**
+- **Sockets**
+- **Logging**
+- **Threading**
+- **JSON**
+- **sys**
 </br>
 
-3. **Play the game:** Players answer the question posed by the server as quickly and accurately as they can. Whichever player's answer is received first will be checked by the server to see if it is correct. The player who answers correctly first will receive 1 point! This game loop lasts for 10 rounds (as of now: 9/22/24), and at the end of the final 10th round, the server will automatically check each player's points to determine a winner. It will then output each player's ranking to all clients, with a congratulatory message for the first-place winner.
-</br>
+### Additional Resources:
 
-**Technologies used:**
-* Python
-* Sockets
-* Logging
-* Threading
-* JSON
-* sys
-</br>
-
-**Additional resources:**
-* [Link to Python documentation]
-* [Link to sockets tutorial]
+- [Python Documentation](https://docs.python.org)
+- [Socket Programming Tutorial](https://realpython.com/python-sockets/)
