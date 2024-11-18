@@ -3,17 +3,27 @@ import threading
 import json
 import logging
 import random
+import argparse
 
 logging.basicConfig(level=logging.INFO)
 
 clients = {}  # Dictionary to store clients and their usernames
-game_state = {}  # Game state to track players' positions, scores, and turns
 current_turn = None  # Track whose turn it is
 next_position = 1  # Track the next position number to assign
 questions = []  # Array to store trivia questions
 current_question = None  # Store the current trivia question
 correct_player = None  # Track who answered correctly
 total_players = None  # Total number of players expected
+
+# Game State
+game_state = {
+    "players": {},  # Tracks player usernames and scores
+    "current_question": None,
+    "turn": None,  # Current player's turn
+    "total_players": None,  # Number of players set by the first client
+    "winner": None,  # Winner's username when determined
+    "game_over": False  # Whether the game is over
+}
 
 # Initialize trivia question bank
 def initialize_questions():
@@ -39,6 +49,17 @@ def get_random_question():
     question = random.choice(questions)
     questions.remove(question)  # Remove the used question from the array
     return question
+
+def reset_game_state():
+    """Reset the game state for a new round."""
+    global game_state
+    game_state["players"] = {player: 0 for player in game_state["players"]}  # Reset scores
+    game_state["current_question"] = None
+    game_state["turn"] = None
+    game_state["winner"] = None
+    game_state["game_over"] = False
+    initialize_questions()  # Reinitialize question bank
+    broadcast(json.dumps({"type": "system", "data": {"message": "Game reset. Starting a new round!"}}))
 
 # Function to handle trivia questions
 def send_question():
@@ -88,33 +109,39 @@ def broadcast(message, sender_socket=None):
 
 def broadcast_game_state():
     """Broadcast the entire game state to all clients."""
-    broadcast(json.dumps({"type": "game_state", "data": game_state}))
+    formatted_state = {
+        "players": {
+            username: {
+                "position": player_data.get("position", "N/A"),
+                "score": player_data.get("score", 0)
+            } for username, player_data in game_state["players"].items()
+        }
+    }
+    broadcast(json.dumps({"type": "game_state", "data": formatted_state}))
 
 def handle_turn_progression():
     """Advance the turn to the next player and notify all clients."""
     global current_turn, correct_player
+    if game_state["game_over"]:
+        return  # Stop turn progression if the game is over
+
     client_list = list(clients.keys())
     if client_list:
-        # Rotate to the next client in the list
         current_index = client_list.index(current_turn) if current_turn in client_list else -1
         next_index = (current_index + 1) % len(client_list)
         current_turn = client_list[next_index]
-        
-        # If it's the first player's turn again, broadcast the result of the last question
-        if current_turn == client_list[0]:
-            if correct_player:
-                broadcast(json.dumps({"type": "system", "data": {"message": f"{correct_player} answered the question correctly!"}}))
-            else:
-                broadcast(json.dumps({"type": "system", "data": {"message": "No one answered the question correctly!"}}))
-            correct_player = None  # Reset for the next question
-            send_question()  # Send a new question
 
-        # Broadcast the current turn to all clients
+        # If back to the first player's turn, send a new question
+        if current_turn == client_list[0]:
+            correct_player = None  # Reset correct player for the next question
+            send_question()
+
         broadcast(json.dumps({"type": "turn_update", "data": {"current_turn": clients[current_turn]}}))
 
 def handle_answer(data, client_socket):
     """Handle a player's answer and check correctness."""
-    global current_question, correct_player
+    global current_question, correct_player, game_state
+
     username = clients[client_socket]
     answer = data.get('answer')
 
@@ -128,7 +155,7 @@ def handle_answer(data, client_socket):
         if answer == current_question["answer"]:
             if correct_player is None:  # Only the first correct answer counts
                 correct_player = username
-            game_state[username]["score"] += 1  # Increment score for correct answer
+            game_state["players"][username]["score"] += 1  # Increment score for correct answer
             logging.info(f"{username} answered correctly!")
             broadcast(json.dumps({"type": "system", "data": {"message": f"{username} answered correctly!"}}))
         else:
@@ -137,8 +164,29 @@ def handle_answer(data, client_socket):
     else:
         logging.info(f"No active question or invalid answer from {username}.")
 
-    # Progress the turn to the next player
-    handle_turn_progression()
+    # Mark the player as having completed their turn
+    game_state["players"][username]["answered"] = True
+
+    # Check if all players have answered
+    if all(player_data.get("answered", False) for player_data in game_state["players"].values()):
+        # Reset 'answered' for all players
+        for player_data in game_state["players"].values():
+            player_data["answered"] = False
+
+        # Broadcast the updated game state
+        broadcast_game_state()
+
+        # Progress the turn to the next player or start a new question
+        if correct_player:
+            broadcast(json.dumps({"type": "system", "data": {"message": f"{correct_player} answered correctly!"}}))
+        else:
+            broadcast(json.dumps({"type": "system", "data": {"message": "No one answered correctly!"}}))
+
+        correct_player = None  # Reset for the next question
+        send_question()  # Send a new question
+    else:
+        # Progress the turn to the next player
+        handle_turn_progression()
 
 def handle_message(message, client_socket):
     """Process incoming JSON messages based on their type."""
@@ -228,7 +276,7 @@ def handle_client(client_socket, address):
                 handle_turn_progression()
         client_socket.close()
 
-def start_server(host='127.0.0.1', port=65433):
+def start_server(host='0.0.0.0', port=65433):
     """Start the server and listen for incoming connections."""
     initialize_questions()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -240,4 +288,13 @@ def start_server(host='127.0.0.1', port=65433):
         client_socket, addr = server.accept()
         threading.Thread(target=handle_client, args=(client_socket, addr)).start()
 
-start_server()
+# Function to parse command-line arguments
+def parse_server_args():
+    parser = argparse.ArgumentParser(description="Start the trivia game server.")
+    parser.add_argument("-p", "--port", type=int, required=True, help="Port for the server to listen on.")
+    return parser.parse_args()
+
+# Main execution entry point
+if __name__ == "__main__":
+    args = parse_server_args()
+    start_server(port=args.port)
