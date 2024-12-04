@@ -29,24 +29,69 @@ game_state = {
 def initialize_questions():
     """Initialize the question databank as a hash map."""
     global questions
-    questions = {
-        "What is the capital of France?": {
-            "options": ["Paris", "London", "Berlin", "Rome"],
-            "correct": 1,  # Correct: Paris (1-based index)
-        },
-        "Which planet is known as the Red Planet?": {
-            "options": ["Earth", "Mars", "Jupiter", "Saturn"],
-            "correct": 2,  # Correct: Mars
-        },
-        "Who wrote 'To Kill a Mockingbird'?": {
-            "options": ["Harper Lee", "Mark Twain", "J.K. Rowling", "Ernest Hemingway"],
-            "correct": 1,  # Correct: Harper Lee
-        },
-        "What is the smallest prime number?": {
-            "options": ["1", "2", "3", "5"],
-            "correct": 2,  # Correct: 2
-        },
-    }
+    
+questions = {
+    "What is the capital of France?": {
+        "options": ["Paris", "London", "Berlin", "Rome"],
+        "correct": 1,  # Correct: Paris
+    },
+    "Which planet is known as the Red Planet?": {
+        "options": ["Earth", "Mars", "Jupiter", "Saturn"],
+        "correct": 2,  # Correct: Mars
+    },
+    "Who wrote 'To Kill a Mockingbird'?": {
+        "options": ["Harper Lee", "Mark Twain", "J.K. Rowling", "Ernest Hemingway"],
+        "correct": 1,  # Correct: Harper Lee
+    },
+    "What is the smallest prime number?": {
+        "options": ["1", "2", "3", "5"],
+        "correct": 2,  # Correct: 2
+    },
+    "What is the tallest mountain in the world?": {
+        "options": ["K2", "Mount Everest", "Kangchenjunga", "Makalu"],
+        "correct": 2,  # Correct: Mount Everest
+    },
+    "Who painted the ceiling of the Sistine Chapel?": {
+        "options": ["Leonardo da Vinci", "Michelangelo", "Raphael", "Donatello"],
+        "correct": 2,  # Correct: Michelangelo
+    },
+    "Which chemical element has the symbol 'He'?": {
+        "options": ["Hydrogen", "Helium", "Hafnium", "Holmium"],
+        "correct": 2,  # Correct: Helium
+    },
+    "In what year did the Titanic sink?": {
+        "options": ["1912", "1920", "1905", "1898"],
+        "correct": 1,  # Correct: 1912
+    },
+    "Which country is known as the Land of the Rising Sun?": {
+        "options": ["China", "Japan", "Thailand", "South Korea"],
+        "correct": 2,  # Correct: Japan
+    },
+    "What is the square root of 144?": {
+        "options": ["10", "11", "12", "13"],
+        "correct": 3,  # Correct: 12
+    },
+    "Who was the first president of the United States?": {
+        "options": ["Thomas Jefferson", "George Washington", "John Adams", "James Madison"],
+        "correct": 2,  # Correct: George Washington
+    },
+    "What is the largest mammal in the world?": {
+        "options": ["Elephant", "Blue Whale", "Great White Shark", "Giraffe"],
+        "correct": 2,  # Correct: Blue Whale
+    },
+    "Which city hosted the 2012 Summer Olympics?": {
+        "options": ["Beijing", "London", "Rio de Janeiro", "Tokyo"],
+        "correct": 2,  # Correct: London
+    },
+    "What is the freezing point of water in Celsius?": {
+        "options": ["-1", "0", "1", "100"],
+        "correct": 2,  # Correct: 0
+    },
+    "What is the main ingredient in guacamole?": {
+        "options": ["Tomato", "Avocado", "Lime", "Onion"],
+        "correct": 2,  # Correct: Avocado
+    },
+}
 
 def get_random_question():
     """Get a random question from the hash map."""
@@ -205,6 +250,14 @@ def handle_answer(data, client_socket):
         logging.info(f"{username} answered incorrectly.")
         broadcast(json.dumps({"type": "system", "data": {"message": f"{username} answered incorrectly."}}))
 
+    # Check for a win condition
+    if game_state["players"][username]["score"] >= 5:
+        logging.info(f"Game over! {username} wins with a score of 5.")
+        broadcast_game_state()  # Show the final scoreboard
+        broadcast(json.dumps({"type": "system", "data": {"message": f"Congratulations, {username}! You Won!"}}))
+        reset_game_state()  # Optionally reset the game for another round
+        return  # Stop further processing as the game is over
+
     # Mark the player as having completed their turn
     game_state["players"][username]["answered"] = True
     logging.info(f"Player {username} marked as 'answered'.")
@@ -216,16 +269,7 @@ def handle_answer(data, client_socket):
             player_data["answered"] = False
 
         # Broadcast updated game state (gameboard)
-        formatted_state = {
-            "players": {
-                user: {
-                    "position": player.get("position", "N/A"),
-                    "score": player.get("score", 0)
-                } for user, player in game_state["players"].items()
-            }
-        }
-        logging.info(f"Game state after validation: {formatted_state}")
-        broadcast(json.dumps({"type": "game_state", "data": formatted_state}))
+        broadcast_game_state()
 
         # Announce round results
         broadcast(json.dumps({"type": "system", "data": {"message": "Round complete! Check the scoreboard."}}))

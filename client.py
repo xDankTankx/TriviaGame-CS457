@@ -57,10 +57,6 @@ def process_server_message(message):
             logging.info(f"{data['data']['username']}: {data['data']['message']}")
             print(f"{data['data']['username']}: {data['data']['message']}")
 
-        elif message_type == 'move':
-            logging.info(f"{data['data']['username']} moved to position {data['data']['position']}")
-            print(f"{data['data']['username']} moved to position {data['data']['position']}")
-
         elif message_type == 'game_state':
             render_game_state(data['data'])
             render_system_message("Scoreboard updated! Prepare for the next question.")
@@ -155,13 +151,9 @@ def connect_to_server():
 
         while True:
             if current_turn == username:
-                msg_type = input("Enter message type (move, chat, quit, answer): ")
-                
-                if msg_type == 'move':
-                    position = input("Enter your move position: ")
-                    send_message(client_socket, 'move', {"position": position})
+                msg_type = input("Enter message type (chat, quit, answer): ")
 
-                elif msg_type == 'chat':
+                if msg_type == 'chat':
                     chat_msg = input("Enter your message: ")
                     send_message(client_socket, 'chat', {"message": chat_msg})
 
