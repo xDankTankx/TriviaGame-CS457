@@ -171,6 +171,7 @@ def connect_to_server():
 
                 elif msg_type == 'answer':
                     answer = input("Enter your answer to the trivia question: ")
+                    logging.info(f"Sending answer: {answer}")
                     send_message(client_socket, 'answer', {"answer": answer})
 
             elif current_turn:
