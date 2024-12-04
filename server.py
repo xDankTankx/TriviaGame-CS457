@@ -27,28 +27,35 @@ game_state = {
 
 # Initialize trivia question bank
 def initialize_questions():
+    """Initialize the question databank as a tuple-based list."""
     global questions
     questions = [
-        {"question": "What is the capital of France?", "options": ["Paris", "London", "Berlin", "Rome"], "answer": "Paris"},
-        {"question": "Which planet is known as the Red Planet?", "options": ["Earth", "Mars", "Jupiter", "Saturn"], "answer": "Mars"},
-        {"question": "Who wrote 'To Kill a Mockingbird'?", "options": ["Harper Lee", "Mark Twain", "J.K. Rowling", "Ernest Hemingway"], "answer": "Harper Lee"},
-        {"question": "What is the smallest prime number?", "options": ["1", "2", "3", "5"], "answer": "2"},
-        {"question": "What is the boiling point of water in Celsius?", "options": ["90", "95", "100", "110"], "answer": "100"},
-        {"question": "Which element has the chemical symbol 'O'?", "options": ["Oxygen", "Osmium", "Gold", "Silver"], "answer": "Oxygen"},
-        {"question": "Who painted the Mona Lisa?", "options": ["Leonardo da Vinci", "Pablo Picasso", "Vincent van Gogh", "Claude Monet"], "answer": "Leonardo da Vinci"},
-        {"question": "What is the largest ocean on Earth?", "options": ["Atlantic", "Pacific", "Indian", "Arctic"], "answer": "Pacific"},
-        {"question": "In which year did World War II end?", "options": ["1942", "1945", "1948", "1950"], "answer": "1945"},
-        {"question": "What is the chemical formula for water?", "options": ["H2O", "CO2", "NaCl", "O2"], "answer": "H2O"},
+        ("What is the capital of France?", ["Paris", "London", "Berlin", "Rome"], 1),
+        ("Which planet is known as the Red Planet?", ["Earth", "Mars", "Jupiter", "Saturn"], 2),
+        ("Who wrote 'To Kill a Mockingbird'?", ["Harper Lee", "Mark Twain", "J.K. Rowling", "Ernest Hemingway"], 1),
+        ("What is the smallest prime number?", ["1", "2", "3", "5"], 2),
+        ("What is the boiling point of water in Celsius?", ["90", "95", "100", "110"], 3),
+        ("Which element has the chemical symbol 'O'?", ["Oxygen", "Osmium", "Gold", "Silver"], 1),
+        ("Who painted the Mona Lisa?", ["Leonardo da Vinci", "Pablo Picasso", "Vincent van Gogh", "Claude Monet"], 1),
+        ("What is the largest ocean on Earth?", ["Atlantic", "Pacific", "Indian", "Arctic"], 2),
+        ("In which year did World War II end?", ["1942", "1945", "1948", "1950"], 2),
+        ("What is the chemical formula for water?", ["H2O", "CO2", "NaCl", "O2"], 1),
     ]
 
 # Function to pick and remove a random question
 def get_random_question():
-    global questions
+    """Pick and remove a random question, returning only the question and options."""
+    global questions, current_question
     if len(questions) == 0:
         return None  # No more questions available
-    question = random.choice(questions)
-    questions.remove(question)  # Remove the used question from the array
-    return question
+
+    # Randomly select a question tuple
+    question_tuple = random.choice(questions)
+    questions.remove(question_tuple)  # Remove it from the databank
+    current_question = question_tuple  # Store the full tuple for server-side use
+
+    # Return only the question and options to be sent to the client
+    return {"question": question_tuple[0], "options": question_tuple[1]}
 
 def reset_game_state():
     """Reset the game state for a new round."""
@@ -63,17 +70,13 @@ def reset_game_state():
 
 # Function to handle trivia questions
 def send_question():
-    global current_question
-    current_question = get_random_question()
-    if current_question:
+    """Send the current question to all clients."""
+    question_data = get_random_question()
+    if question_data:
         broadcast(json.dumps({
             "type": "question",
-            "data": {
-                "question": current_question["question"],
-                "options": current_question["options"]
-            }
+            "data": question_data  # Send only the question and options
         }))
-        return current_question
     else:
         logging.info("No more questions available.")
         broadcast(json.dumps({
@@ -82,7 +85,6 @@ def send_question():
                 "message": "No more questions available. The game has ended!"
             }
         }))
-        return None
 
 def send_current_question(client_socket):
     """Send the current question to a specific client if one is active."""
@@ -122,68 +124,89 @@ def broadcast_game_state():
 def handle_turn_progression():
     """Advance the turn to the next player and notify all clients."""
     global current_turn, correct_player
+
     if game_state["game_over"]:
         return  # Stop turn progression if the game is over
 
     client_list = list(clients.keys())
-    if client_list:
-        current_index = client_list.index(current_turn) if current_turn in client_list else -1
-        next_index = (current_index + 1) % len(client_list)
-        current_turn = client_list[next_index]
+    if not client_list:
+        return  # No clients to handle
 
-        # If back to the first player's turn, send a new question
-        if current_turn == client_list[0]:
-            correct_player = None  # Reset correct player for the next question
-            send_question()
+    # Get the current index of the player whose turn it is
+    current_index = client_list.index(current_turn) if current_turn in client_list else -1
+    next_index = (current_index + 1) % len(client_list)  # Circularly progress to the next player
+    current_turn = client_list[next_index]
 
-        broadcast(json.dumps({"type": "turn_update", "data": {"current_turn": clients[current_turn]}}))
+    # Notify all clients about the turn update
+    broadcast(json.dumps({
+        "type": "turn_update",
+        "data": {"current_turn": clients[current_turn]}
+    }))
+
+    # If the next turn cycles back to the first player, send a new question
+    if next_index == 0:  # Check if we've cycled back to the first player
+        correct_player = None  # Reset correct player for the next question
+        threading.Timer(3, send_question).start()  # Slight delay before sending the next question
+
+
 
 def handle_answer(data, client_socket):
     """Handle a player's answer and check correctness."""
-    global current_question, correct_player, game_state
+    global current_question, game_state, current_turn
 
     username = clients[client_socket]
-    answer = data.get('answer')
+    answer = data.get('answer')  # Player's submitted answer
 
+    # Store the player's answer in their game state for later validation
     if current_question and answer:
-        # Convert numeric input to option text if necessary
-        if answer.isdigit():
-            option_index = int(answer) - 1  # Convert to 0-based index
-            if 0 <= option_index < len(current_question["options"]):
-                answer = current_question["options"][option_index]
-
-        if answer == current_question["answer"]:
-            if correct_player is None:  # Only the first correct answer counts
-                correct_player = username
-            game_state["players"][username]["score"] += 1  # Increment score for correct answer
-            logging.info(f"{username} answered correctly!")
-            broadcast(json.dumps({"type": "system", "data": {"message": f"{username} answered correctly!"}}))
-        else:
-            logging.info(f"{username} answered incorrectly.")
-            broadcast(json.dumps({"type": "system", "data": {"message": f"{username} answered incorrectly."}}))
+        game_state["players"][username]["current_answer"] = answer
+        logging.info(f"Player {username} submitted answer: {answer}")
     else:
         logging.info(f"No active question or invalid answer from {username}.")
 
     # Mark the player as having completed their turn
     game_state["players"][username]["answered"] = True
+    logging.info(f"Player {username} marked as 'answered'.")
 
     # Check if all players have answered
     if all(player_data.get("answered", False) for player_data in game_state["players"].values()):
-        # Reset 'answered' for all players
-        for player_data in game_state["players"].values():
-            player_data["answered"] = False
+        # Validate answers and update scores
+        correct_choice = current_question[2]  # Correct answer index (1-based)
+        for player, data in game_state["players"].items():
+            if data.get("current_answer") == str(correct_choice):  # Compare as string
+                data["score"] += 1  # Increment score for correct answer
+                logging.info(f"Player {player} answered correctly! New score: {data['score']}")
+            else:
+                logging.info(f"Player {player} answered incorrectly.")
 
-        # Broadcast the updated game state
-        broadcast_game_state()
+        # Reset 'answered' and 'current_answer' for all players
+        for data in game_state["players"].values():
+            data["answered"] = False
+            data.pop("current_answer", None)  # Remove temporary answer
 
-        # Progress the turn to the next player or start a new question
-        if correct_player:
-            broadcast(json.dumps({"type": "system", "data": {"message": f"{correct_player} answered correctly!"}}))
-        else:
-            broadcast(json.dumps({"type": "system", "data": {"message": "No one answered correctly!"}}))
+        # Broadcast the updated game state (gameboard)
+        formatted_state = {
+            "players": {
+                user: {
+                    "position": player.get("position", "N/A"),
+                    "score": player.get("score", 0)
+                } for user, player in game_state["players"].items()
+            }
+        }
+        broadcast(json.dumps({"type": "game_state", "data": formatted_state}))
 
-        correct_player = None  # Reset for the next question
-        send_question()  # Send a new question
+        # Announce the end of the round
+        broadcast(json.dumps({"type": "system", "data": {"message": "Round complete! Check the scoreboard."}}))
+
+        # Reset to the first player's turn and send a new question
+        client_list = list(clients.keys())
+        if client_list:
+            current_turn = client_list[0]
+            broadcast(json.dumps({
+                "type": "turn_update",
+                "data": {"current_turn": clients[current_turn]}
+            }))
+            threading.Timer(3, send_question).start()  # Delay before the next question
     else:
         # Progress the turn to the next player
         handle_turn_progression()
@@ -208,8 +231,8 @@ def handle_message(message, client_socket):
             username = data['data']['username']
             if client_socket not in clients:
                 clients[client_socket] = username
-                game_state[username] = {"position": next_position, "score": 0}
-                next_position += 1  # Increment position for the next player
+                game_state["players"][username] = {"position": next_position, "score": 0, "answered": False}
+                next_position += 1
                 logging.info(f"{username} has joined the game.")
                 
                 # Broadcast system message about new join

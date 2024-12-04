@@ -62,7 +62,9 @@ def process_server_message(message):
             print(f"{data['data']['username']} moved to position {data['data']['position']}")
 
         elif message_type == 'game_state':
-            render_game_state(data['data'])  # Updated to use render_game_state
+            render_game_state(data['data'])
+            render_system_message("Scoreboard updated! Prepare for the next question.")
+
 
         elif message_type == 'turn_update':
             current_turn = data['data']['current_turn']
