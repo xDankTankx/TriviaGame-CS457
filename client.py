@@ -1,12 +1,13 @@
 import socket
 import threading
 import json
-import logging
 import argparse
 import sys
 import time
 
-logging.basicConfig(level=logging.INFO)
+# Suppress unnecessary logging on the client side
+import logging
+logging.basicConfig(level=logging.WARNING)
 
 username = None
 stop_flag = False
@@ -25,17 +26,11 @@ def receive_messages(client_socket):
             
             for message in messages:
                 if message:
-                    sys.stdout.write('\r' + ' ' * len("Enter message type (move, chat, quit, answer): ") + '\r')
-                    sys.stdout.flush()
-
-                    logging.info(f"New message: {message}")
                     process_server_message(message)
-
-                    print("Enter message type (move, chat, quit, answer): ", end='', flush=True)
-                
+                    print("Enter message type (chat, quit, answer): ", end='', flush=True)
         except Exception as e:
             if not stop_flag:
-                logging.error(f"Error receiving message: {e}")
+                print(f"Error receiving message: {e}")
             break
 
 def process_server_message(message):
@@ -46,7 +41,7 @@ def process_server_message(message):
         message_type = data['type']
 
         if message_type == 'system':
-            render_system_message(data['data']['message'])  # Updated to use render_system_message
+            render_system_message(data['data']['message'])
             
         elif message_type == 'prompt':  # Handle the prompt for total players
             render_system_message(data['data']['message'])
@@ -54,23 +49,21 @@ def process_server_message(message):
             send_message(client_socket, 'total_players', {"count": num_players})
 
         elif message_type == 'chat':
-            logging.info(f"{data['data']['username']}: {data['data']['message']}")
             print(f"{data['data']['username']}: {data['data']['message']}")
 
         elif message_type == 'game_state':
             render_game_state(data['data'])
             render_system_message("Scoreboard updated! Prepare for the next question.")
 
-
         elif message_type == 'turn_update':
             current_turn = data['data']['current_turn']
-            render_system_message(f"It's now {current_turn}'s turn!")  # Updated to use render_system_message
+            render_system_message(f"It's now {current_turn}'s turn!")
 
         elif message_type == 'question':
-            render_question(data['data'])  # Updated to use render_question
+            render_question(data['data'])
 
     except json.JSONDecodeError as e:
-        logging.error(f"Failed to decode server message: {e}")
+        print(f"Failed to decode server message: {e}")
 
 def render_game_state(game_state):
     """Render the game state for display."""
@@ -133,7 +126,6 @@ def connect_to_server():
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((args.ip, args.port))
-        logging.info(f"Connected to server at {args.ip}:{args.port}")
 
         # Check if this is the first client and prompt for total players
         is_first_client = input("Are you the first client to join? (yes/no): ").lower()
@@ -163,7 +155,6 @@ def connect_to_server():
 
                 elif msg_type == 'answer':
                     answer = input("Enter your answer to the trivia question: ")
-                    logging.info(f"Sending answer: {answer}")
                     send_message(client_socket, 'answer', {"answer": answer})
 
             elif current_turn:
@@ -171,11 +162,11 @@ def connect_to_server():
                 time.sleep(5)
 
     except socket.error as e:
-        logging.error(f"Error: {e}")
+        print(f"Error: {e}")
     finally:
         stop_flag = True
         client_socket.close()
-        logging.info("Disconnected from server")
+        print("Disconnected from server")
         receive_thread.join()
 
 if __name__ == "__main__":
