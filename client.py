@@ -117,6 +117,18 @@ def parse_client_args():
     parser.add_argument("-p", "--port", type=int, required=True, help="Port to connect to.")
     return parser.parse_args()
 
+def get_valid_answer():
+    """Prompt the user for a valid answer between 1 and 4."""
+    while True:
+        try:
+            answer = int(input("Enter your answer (1-4): "))
+            if 1 <= answer <= 4:
+                return answer
+            else:
+                print("Invalid choice. Please enter a number between 1 and 4.")
+        except ValueError:
+            print("Invalid input. Please enter a numeric value between 1 and 4.")
+
 def connect_to_server():
     """Connect to the server and start receiving/sending messages."""
     global username, stop_flag, current_turn, client_socket
@@ -154,7 +166,7 @@ def connect_to_server():
                     break
 
                 elif msg_type == 'answer':
-                    answer = input("Enter your answer to the trivia question: ")
+                    answer = get_valid_answer()
                     send_message(client_socket, 'answer', {"answer": answer})
 
             elif current_turn:
