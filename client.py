@@ -86,7 +86,7 @@ def render_game_state(game_state):
 def render_question(question_data):
     """Render the trivia question for the player."""
     print("\n" + "=" * 40)
-    print("🎯 Trivia Question 🎯")
+    print(f"🎯 Trivia Question 🎯 | Questions Remaining: {question_data.get('questions_remaining', 'N/A')}")
     print("=" * 40)
     print(question_data['question'])
     print("\nOptions:")
