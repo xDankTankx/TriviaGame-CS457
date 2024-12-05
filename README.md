@@ -43,7 +43,7 @@ This is a simple yet enjoyable trivia game you may play by yourself or with up t
    - Each client enters their username upon connecting and sees the updated game state.
    - During their turn, players answer questions by entering the option number corresponding to their chosen answer.
    - Points are awarded for correct answers, and scores are updated in real time.
-   - The game continues until all questions are answered, and the winner is determined based on the final scores.
+   - The game continues until all questions are answered, or the winner is crowned after 5 correct guesses.
    </br>
 
 ### Game Flow:
@@ -52,7 +52,7 @@ This is a simple yet enjoyable trivia game you may play by yourself or with up t
 - **Question Display:** The server broadcasts a trivia question to all clients.
 - **Turn-Based Answering:** Only the active player can respond during their turn. If the answer is incorrect, the next player gets their turn.
 - **Score Updates:** After all players have answered, the game state is updated and displayed to all clients.
-- **Winning:** The game ends after a set number of rounds (default: 10). The player with the highest score wins, with results broadcasted to all clients.
+- **Winning:** The game ends after a player gets a score of 5 or the question pool is depleted. 
 </br>
 
 ### Technologies Used:
