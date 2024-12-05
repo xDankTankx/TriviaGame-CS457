@@ -122,7 +122,7 @@ def reset_game_state():
 
 def send_question():
     """Send the next question to all clients and set the current question."""
-    global current_question
+    global current_question, questions
 
     # Fetch a random question
     question_data = get_random_question()
@@ -136,12 +136,13 @@ def send_question():
         }
 
         logging.info(f"New question: {question_text} (Correct answer index: {correct_choice})")
-        # Broadcast the question and options
+        # Broadcast the question and options along with the questions remaining
         broadcast(json.dumps({
             "type": "question",
             "data": {
                 "question": question_text,
-                "options": options
+                "options": options,
+                "questions_remaining": len(questions)  # Include questions remaining
             }
         }))
     else:
@@ -152,7 +153,6 @@ def send_question():
                 "message": "No more questions available. The game has ended!"
             }
         }))
-
 
 def send_current_question(client_socket):
     """Send the current question to a specific client if one is active."""
