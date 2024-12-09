@@ -313,24 +313,64 @@ def handle_message(message, client_socket):
 
     except json.JSONDecodeError as e:
         logging.error(f"Failed to decode message: {e}")
+        
+def handle_quit(client_socket):
+    """Handle when a player quits or disconnects."""
+    global current_question
+
+    if client_socket in clients:
+        username = clients[client_socket]
+        logging.info(f"{username} has quit the game.")
+        
+        # Notify other players
+        broadcast(json.dumps({
+            "type": "system",
+            "data": {"message": f"{username} has left the game!"}
+        }))
+        
+        # Remove the player from the client list and game state
+        del clients[client_socket]
+        if username in game_state["players"]:
+            del game_state["players"][username]
+
+        # Broadcast updated game state
+        broadcast_game_state()
+
+        # Check if all remaining players have answered
+        remaining_players = list(game_state["players"].values())
+        if all(player.get("answered", False) for player in remaining_players):
+            logging.info("All remaining players have answered. Ending round...")
+            threading.Timer(1, end_round).start()
+        elif not remaining_players:
+            # If no players remain, log and stop the game gracefully
+            logging.info("No players remaining. Stopping the game.")
+            broadcast(json.dumps({
+                "type": "system",
+                "data": {"message": "All players have left the game. The game is stopping."}
+            }))
+            shutdown_game()
+
+    # Close the client socket
+    try:
+        client_socket.close()
+    except Exception as e:
+        logging.error(f"Error closing client socket: {e}")
 
 def handle_client(client_socket, address):
-    """Handle a single client."""
+    """Handle communication with a connected client."""
+    logging.info(f"Connection from {address}")
+
     try:
         while True:
             message = client_socket.recv(1024).decode('utf-8')
             if not message:
-                break
+                break  # Client disconnected
             handle_message(message, client_socket)
     except Exception as e:
-        logging.error(f"Client error: {e}")
+        logging.error(f"Error handling client {address}: {e}")
     finally:
-        username = clients.pop(client_socket, None)
-        if username:
-            logging.info(f"{username} disconnected.")
-            broadcast_game_state()
+        handle_quit(client_socket)  # Ensure client cleanup on disconnection
         client_socket.close()
-
 
 def shutdown_game():
     """Shut down the server."""
