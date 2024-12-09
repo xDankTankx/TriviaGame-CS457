@@ -148,9 +148,6 @@ def connect_to_server():
             try:
                 msg_type = input("Enter message type (chat, quit, answer): ")
 
-                if stop_flag:  # Check if shutdown message was received
-                    break
-
                 if msg_type == 'chat':
                     chat_msg = input("Enter your message: ")
                     send_message(client_socket, 'chat', {"message": chat_msg})
@@ -166,6 +163,7 @@ def connect_to_server():
 
             except KeyboardInterrupt:
                 print("\nExiting the game. Goodbye!")
+                send_message(client_socket, 'quit', {})
                 stop_flag = True
                 break
 
@@ -176,7 +174,8 @@ def connect_to_server():
         print("\nDisconnected from server.")
         if client_socket:
             client_socket.close()
-        sys.exit(0)  # Ensure immediate exit
+        sys.exit(0)
+
 
 
 if __name__ == "__main__":
