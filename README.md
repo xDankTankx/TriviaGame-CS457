@@ -47,7 +47,7 @@ This is a simple yet enjoyable trivia game you may play by yourself or with up t
 
 - Each client enters their username upon connecting and sees the updated game state.
 - Players answer questions by entering the option number corresponding to their chosen answer.
-- Players cannot change their answers after submitting, and repeated attempts are blocked with an error message.
+- (This was meant to be a feature but it has some kinks, please read below) Players cannot change their answers after submitting, and repeated attempts are blocked with an error message.
 - Points are awarded for correct answers, and the scoreboard updates in real time.
 - The game ends when a player reaches 5 points or the questions run out, with the final scores displayed to all players.
 
